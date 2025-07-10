@@ -9,13 +9,11 @@ def main():
     db = client.arrocera_erp_db
     lic_col = db.licitaciones
 
-    scraper = MPScraper(False)
+    scraper = MPScraper()
 
     df = scraper.request_merge_and_clean_lics()
 
     results = df.to_dict(orient='records')
-
-    print(results)
 
     lic_col.insert_many(results)
     
@@ -37,6 +35,8 @@ def main():
     ]
 
     duplicates = lic_col.aggregate(pipeline)
+
+    print(f"Se eliminaron {len(duplicates)} licitaciones duplicadas")
 
     scraper.cleanup_downloads()
 

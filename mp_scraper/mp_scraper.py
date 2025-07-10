@@ -15,7 +15,7 @@ from selenium.common.exceptions import TimeoutException, StaleElementReferenceEx
 from webdriver_manager.chrome import ChromeDriverManager
 
 class MPScraper: 
-    def __init__(self, headless:bool = False):
+    def __init__(self, headless:bool = True):
 
         options = Options()
 
