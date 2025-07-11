@@ -36,6 +36,13 @@ def main():
 
     duplicates = lic_col.aggregate(pipeline)
 
+    for doc in duplicates:
+        all_ids = doc["ids"]
+        # Decide which one to keep. Here we keep the first in the list:
+        ids_to_remove = all_ids[1:]
+        result = lic_col.delete_many({"_id": {"$in": ids_to_remove}})
+        print(f"Removed {result.deleted_count} duplicates for id={doc['_id']}")
+
     print(f"Se eliminaron {len(list(duplicates))} licitaciones duplicadas")
 
     scraper.cleanup_downloads()
