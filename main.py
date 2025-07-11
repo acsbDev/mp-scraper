@@ -36,7 +36,7 @@ def main():
 
     duplicates = lic_col.aggregate(pipeline)
 
-    print(f"Se eliminaron {len(duplicates)} licitaciones duplicadas")
+    print(f"Se eliminaron {len(list(duplicates))} licitaciones duplicadas")
 
     scraper.cleanup_downloads()
 
