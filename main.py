@@ -13,6 +13,9 @@ def main():
 
     df = scraper.request_merge_and_clean_lics()
 
+    if df.empty:
+        return
+
     results = df.to_dict(orient='records')
 
     lic_col.insert_many(results)

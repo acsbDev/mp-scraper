@@ -148,7 +148,7 @@ class MPScraper:
                         df = pd.read_excel(the_xlsx, usecols="B:O", header=7)
 
         df_list = pd.read_csv(os.path.join(self.download_dir, 'ListaLicitaciones.csv'), sep=";", usecols=["IDLicitacion", "Moneda", "MontoLicitacion"])
-
+        
         df.drop(columns=["Unnamed: 3", "Unnamed: 8", "Tipo Adquisición", "Código ONU", "Descripción"], inplace=True)
 
         rename_columns = {
@@ -177,8 +177,13 @@ class MPScraper:
         to_date = today
 
         df_filtered = df[(df["Fecha Publicación"] >= from_date) & (df["Fecha Publicación"] <= to_date) & (df["Numero Adquisición"].str.contains(pattern))].reset_index(drop=True)
-
+        
         df_filtered.rename(columns=rename_columns, inplace=True)
+
+        if df_filtered.empty:
+            print("No se encontraron licitaciones")
+            return pd.DataFrame(columns=df_filtered.columns)
+        
         df_list.rename(columns={"IDLicitacion":"id", "MontoLicitacion":"budget", "Moneda":"currency"}, inplace=True)
 
         prod_count = df_filtered.groupby('id').agg(
