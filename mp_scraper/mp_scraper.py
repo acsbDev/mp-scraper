@@ -163,7 +163,7 @@ class MPScraper:
             "Cantidad": "qty"
         }
 
-        categories = ["L1", "LE", "LP", "LQ", "LR"]
+        categories = ["L1", "LE", "LP", "LQ", "LR", "CO", "B2", "H2", "I2"]
         pattern = '|'.join(categories)
 
         today = pd.Timestamp.today().normalize()
