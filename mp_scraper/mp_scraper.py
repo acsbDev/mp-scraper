@@ -11,7 +11,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, WebDriverException
+from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, WebDriverException, NoAlertPresentException
 from webdriver_manager.chrome import ChromeDriverManager
 
 class MPScraper: 
@@ -74,6 +74,13 @@ class MPScraper:
             time.sleep(0.5)
 
         raise TimeoutError(f"No completed download in {self.download_dir} after {timeout}s")
+    
+    def _dismiss_alert_if_present(self):
+        try:
+            alert = self.driver.switch_to.alert
+            alert.accept()
+        except NoAlertPresentException:
+            pass
 
     def _get_csv_from_search(self):
         
@@ -81,6 +88,7 @@ class MPScraper:
         while retries < self.max_retries:
             try:
                 self.driver.get("https://www.mercadopublico.cl/Home/BusquedaLicitacion")
+                self._dismiss_alert_if_present()
                 break
             except WebDriverException:
                 retries += 1
@@ -116,6 +124,7 @@ class MPScraper:
         while retries < self.max_retries:
             try:
                 self.driver.get("https://www.mercadopublico.cl/")
+                self._dismiss_alert_if_present()
                 break
             except WebDriverException:
                 retries += 1
