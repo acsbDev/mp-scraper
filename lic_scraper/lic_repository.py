@@ -29,6 +29,11 @@ class LicRepository:
     def delete_duplicates(self) -> int:
         pipeline = [
             {
+                "$sort": {
+                    "_id": 1,
+                }
+            },
+            {
                 "$group": {
                     "_id": "$id",
                     "ids": {"$push": "$_id"},
@@ -47,8 +52,7 @@ class LicRepository:
         deleted_count = 0
 
         for doc in duplicates:
-            all_ids = doc["ids"]
-            ids_to_remove = all_ids[1:]
+            ids_to_remove = doc["ids"][1:]
 
             result = self.lic_col.delete_many(
                 {"_id": {"$in": ids_to_remove}}

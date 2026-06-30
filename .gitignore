@@ -208,5 +208,8 @@ __marimo__/
 
 .env
 
-mp_scraper/*.csv
-mp_scraper/*.zip
+lic_scraper/*.csv
+lic_scraper/*.zip
+
+scraper_state.json
+**/scraper_state.json

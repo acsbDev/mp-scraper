@@ -5,6 +5,7 @@ from lic_scraper.mp_web_scraper import MPWebScraper
 from lic_scraper.lic_transformer import LicTransformer
 from lic_scraper.lic_repository import LicRepository
 from lic_scraper.lic_runner import LicScraperRunner
+from lic_scraper.run_state import RunState
 
 
 def main():
@@ -16,16 +17,17 @@ def main():
         max_retries=settings.max_retries,
     )
 
-    transformer = LicTransformer(
-        download_dir=web_scraper.download_dir,
-    )
+    transformer = LicTransformer()
 
     repository = LicRepository(db)
+
+    run_state = RunState()
 
     runner = LicScraperRunner(
         web_scraper=web_scraper,
         transformer=transformer,
         repository=repository,
+        run_state=run_state,
     )
 
     try:

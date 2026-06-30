@@ -27,7 +27,6 @@ def _get_bool_env(name: str, default: bool = True) -> bool:
 class Settings:
     mongo_uri: str
     db_name: str
-    download_dir: str
     max_retries: int
     headless: bool
 
@@ -35,6 +34,6 @@ class Settings:
 settings = Settings(
     mongo_uri=_get_required_env("ATLAS_URI"),
     db_name=os.getenv("DB_NAME", "arrocera_erp_db"),
-    max_retries=int(os.getenv("MAX_RETRIES", "20")),
+    max_retries=int(os.getenv("MAX_RETRIES", "3")),
     headless=_get_bool_env("HEADLESS", True),
 )

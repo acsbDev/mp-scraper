@@ -1,6 +1,7 @@
 import os
 import time
 import re
+import logging
 from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -11,20 +12,25 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, WebDriverException, NoAlertPresentException
 from webdriver_manager.chrome import ChromeDriverManager
 
+
 class MPWebScraper:
 
-    def __init__(self, headless:bool = True, max_retries: int = 3, download_dir: str | None = None,):
+    def __init__(self, headless: bool = True, max_retries: int = 3, download_dir: str | None = None,):
+
+        self.log = logging.getLogger(self.__class__.__name__)
+        Path(self.download_dir).mkdir(parents=True, exist_ok=True)
+
+        self.download_dir = download_dir or os.path.dirname(
+            os.path.abspath(__file__))
 
         options = Options()
-
-        self.download_dir = download_dir or os.path.dirname(os.path.abspath(__file__))
 
         if headless:
             options.add_argument("--headless")
             options.add_argument("--window-size=1920,1080")
-            options.add_argument("--disable-gpu")               # recommended for Linux
-            options.add_argument("--no-sandbox")                # recommended in many CI systems
-            options.add_argument("--disable-dev-shm-usage") 
+            options.add_argument("--disable-gpu")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
 
         prefs = {
             "download.default_directory": self.download_dir,
@@ -40,7 +46,7 @@ class MPWebScraper:
         self.wait = WebDriverWait(self.driver, 30)
         self.max_retries = max_retries
 
-    def _wait_for_downloads(self, endswith, timeout=60):
+    def _wait_for_downloads(self, endswith: str, started_at: float, timeout: int = 60):
         """
         Wait up to `timeout` seconds for any .crdownload/.part files in
         download_dir to disappear and for at least one new file to appear.
@@ -51,15 +57,34 @@ class MPWebScraper:
         while time.time() < end_time:
             files = os.listdir(self.download_dir)
             # filter out temporary partial downloads
-            completed = [f for f in files if f.endswith(endswith)]
-            if completed:
-                # 2) make sure no partials remain
-                if not any(f.endswith((".crdownload", ".part")) for f in files):
-                    return os.path.join(self.download_dir, completed[0])
+
+            has_partial_downloads = any(
+                file.endswith((".crdownload", ".part"))
+                for file in files
+            )
+
+            completed_files = [
+                file
+                for file in files
+                if file.endswith(endswith)
+                and os.path.getmtime(os.path.join(self.download_dir, file)) >= started_at
+            ]
+
+            if completed_files and not has_partial_downloads:
+                completed_files.sort(
+                    key=lambda file: os.path.getmtime(
+                        os.path.join(self.download_dir, file)
+                    ),
+                    reverse=True,
+                )
+
+                return os.path.join(self.download_dir, completed_files[0])
+
             time.sleep(0.5)
 
-        raise TimeoutError(f"No completed download in {self.download_dir} after {timeout}s")
-    
+        raise TimeoutError(
+            f"No completed download in {self.download_dir} after {timeout}s")
+
     def _dismiss_alert_if_present(self):
         try:
             alert = self.driver.switch_to.alert
@@ -67,34 +92,54 @@ class MPWebScraper:
         except NoAlertPresentException:
             pass
 
-    def get_csv_from_search(self):
-        
-        retries = 0
-        while retries < self.max_retries:
+    def _open_url_with_retry(self, url: str) -> None:
+        for attempt in range(self.max_retries):
             try:
-                self.driver.get("https://www.mercadopublico.cl/Home/BusquedaLicitacion")
+                self.driver.get(url)
                 self._dismiss_alert_if_present()
-                break
-            except WebDriverException:
-                retries += 1
+                return
+            except WebDriverException as e:
+                self.log.warning(
+                    f"No se pudo abrir la URL. Intento {attempt + 1}/{self.max_retries}. Error: {e}"
+                )
                 time.sleep(1)
 
-        self.driver.switch_to.frame("form-iframe")
+        raise RuntimeError(
+            f"No se pudo abrir la URL después de {self.max_retries} intentos: {url}")
 
-        select_el = self.wait.until(EC.presence_of_element_located((By.ID, "selectestado")))
+    def get_csv_from_search(self):
+
+        self._open_url_with_retry(
+            "https://www.mercadopublico.cl/Home/BusquedaLicitacion"
+        )
+
+        # self.driver.switch_to.frame("form-iframe")
+
+        self.driver.switch_to.default_content()
+
+        self.wait.until(
+            EC.frame_to_be_available_and_switch_to_it((By.ID, "form-iframe"))
+        )
+
+        select_el = self.wait.until(
+            EC.presence_of_element_located((By.ID, "selectestado")))
         Select(select_el).select_by_value("5")
 
-        select_el = self.wait.until(EC.presence_of_element_located((By.ID, "ordenarpor")))
+        select_el = self.wait.until(
+            EC.presence_of_element_located((By.ID, "ordenarpor")))
         Select(select_el).select_by_value("3")
 
-        self.wait.until(EC.invisibility_of_element_located((By.ID, "preloader")))
+        self.wait.until(
+            EC.invisibility_of_element_located((By.ID, "preloader")))
 
-        retries = 0
-        while retries < self.max_retries:
+        for attempt in range(self.max_retries):
             try:
-                download_btn = self.wait.until(EC.presence_of_element_located((By.ID, "descargarCSV")))
-                self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", download_btn)
-                self.driver.execute_script("arguments[0].click();", download_btn)
+                download_btn = self.wait.until(
+                    EC.presence_of_element_located((By.ID, "descargarCSV")))
+                self.driver.execute_script(
+                    "arguments[0].scrollIntoView({block: 'center'});", download_btn)
+                self.driver.execute_script(
+                    "arguments[0].click();", download_btn)
                 print("Clicked on descargarCSV")
                 break
             except (TimeoutException, StaleElementReferenceException):
@@ -105,47 +150,43 @@ class MPWebScraper:
         self._wait_for_downloads(".csv")
 
     def get_zip_from_mainpage(self):
-        retries = 0
-        while retries < self.max_retries:
-            try:
-                self.driver.get("https://www.mercadopublico.cl/")
-                self._dismiss_alert_if_present()
-                break
-            except WebDriverException:
-                retries += 1
-                time.sleep(1)
+        self._open_url_with_retry("https://www.mercadopublico.cl/")
 
-        btn = self.driver.find_element(By.XPATH, "//button[normalize-space(text())='Descargar']")
+        btn = self.wait.until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//button[normalize-space(text())='Descargar']")
+            )
+        )
 
-        # 2) Extract the URL from its onclick attribute
-        onclick = btn.get_attribute("onclick")
-        # e.g. "location.href='https://.../att.ashx?id=5'"
+        onclick = btn.get_attribute("onclick") or ""
         match = re.search(r"'([^']+)'", onclick)
 
         if not match:
-            raise RuntimeError("Couldn't parse download URL")
-        
+            raise RuntimeError("No se pudo obtener la URL de descarga del ZIP")
+
         download_url = match.group(1)
 
-        # 3) Navigate straight to it
+        started_at = time.time()
+
         self.driver.get(download_url)
 
-        self._wait_for_downloads(".zip")
+        self.log.info("Descarga ZIP iniciada")
 
-    def cleanup_downloads(self):
-        """
-        Remove all .csv, .xlsx and .zip files in download_dir.
-        """
-    
+        return self._wait_for_downloads(".zip", started_at)
+
+    def cleanup_downloads(self) -> None:
         p = Path(self.download_dir)
 
         for pattern in ("*.csv", "*.xlsx", "*.zip"):
-            for f in p.glob(pattern):
+            for file in p.glob(pattern):
                 try:
-                    f.unlink()
-                    print(f"Deleted {f.name}")
+                    file.unlink()
+                    self.log.info(f"Archivo eliminado: {file.name}")
                 except Exception as e:
-                    print(f"Could not delete {f.name}: {e}")
+                    self.log.warning(f"No se pudo eliminar {file.name}: {e}")
 
-    def close(self):
-        self.driver.quit()
+    def close(self) -> None:
+        try:
+            self.driver.quit()
+        except Exception as e:
+            self.log.warning(f"No se pudo cerrar el navegador correctamente: {e}")
