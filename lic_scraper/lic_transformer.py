@@ -1,20 +1,38 @@
 import re
-import json
 import zipfile
 import unidecode
 import pandas as pd
-from pathlib import Path
 
 
 class LicTransformer:
+    """
+    Clase encargada de leer, limpiar y transformar los archivos descargados de licitaciones.
+
+    Procesa el archivo ZIP con el Excel de licitaciones publicadas y el CSV con datos
+    complementarios, filtra las licitaciones según rango de fechas y categorías
+    permitidas, normaliza textos, calcula cantidad de productos y construye el
+    DataFrame final listo para ser guardado en MongoDB.
+
+    Esta clase no realiza scraping ni operaciones contra la base de datos.
+    """
 
     def _normalize_text(self, text):
-        # Verificar si el texto es una cadena de texto
+        """
+        Normaliza un valor de texto.
+
+        Convierte strings a minúsculas, elimina tildes o caracteres especiales y reduce
+        múltiples espacios a uno solo. Si el valor recibido no es un string, retorna una
+        cadena vacía.
+
+        Args:
+            text: Valor a normalizar.
+
+        Returns:
+            str: Texto normalizado.
+        """
         if isinstance(text, str):
-            # Convertir a minúsculas y eliminar caracteres especiales/acentos
             normalized = unidecode.unidecode(text.lower())
 
-            # Reemplaza multiples espacios en uno solo
             normalized = re.sub(r'\s+', ' ', normalized)
 
             return normalized.strip()
@@ -22,6 +40,21 @@ class LicTransformer:
         return ''
 
     def _read_lic_xlsx_from_zip(self, zip_path: str) -> pd.DataFrame:
+        """
+        Lee el archivo Excel de licitaciones contenido dentro de un ZIP.
+
+        Busca el primer archivo .xlsx dentro del ZIP descargado desde MercadoPublico y
+        lo carga en un DataFrame usando las columnas y encabezado esperados.
+
+        Args:
+            zip_path: Ruta del archivo ZIP descargado.
+
+        Returns:
+            pd.DataFrame: DataFrame con la información base de licitaciones.
+
+        Raises:
+            FileNotFoundError: Si no se encuentra ningún archivo .xlsx dentro del ZIP.
+        """
         with zipfile.ZipFile(zip_path) as the_zip:
             xlsx_files = [
                 file_name
@@ -37,6 +70,18 @@ class LicTransformer:
                 return pd.read_excel(the_xlsx, usecols="B:O", header=7)
 
     def _read_lic_csv(self, csv_path: str) -> pd.DataFrame:
+        """
+        Lee el archivo CSV complementario de licitaciones.
+
+        Carga los campos necesarios del CSV descargado desde MercadoPublico, incluyendo
+        el ID de licitación, moneda y monto de licitación.
+
+        Args:
+            csv_path: Ruta del archivo CSV descargado.
+
+        Returns:
+            pd.DataFrame: DataFrame con los datos complementarios de licitaciones.
+        """
         return pd.read_csv(
             csv_path,
             sep=";",
@@ -44,6 +89,26 @@ class LicTransformer:
         )
 
     def clean_data(self, zip_path, csv_path, from_date: pd.Timestamp, to_date: pd.Timestamp):
+        """
+        Limpia y transforma los archivos descargados de licitaciones.
+
+        Lee el Excel contenido en el ZIP y el CSV complementario, elimina columnas no
+        utilizadas, filtra licitaciones por fecha y tipo, renombra columnas, normaliza
+        textos, calcula la cantidad de productos por licitación, incorpora presupuesto y
+        moneda, marca licitaciones con demasiados productos y agrupa los productos en una
+        lista por cada licitación.
+
+        Args:
+            zip_path: Ruta del archivo ZIP descargado.
+            csv_path: Ruta del archivo CSV descargado.
+            from_date: Fecha inicial del rango de publicación a considerar.
+            to_date: Fecha final del rango de publicación a considerar.
+
+        Returns:
+            pd.DataFrame: DataFrame final con una fila por licitación, incluyendo datos
+            generales, presupuesto, moneda, productos asociados, campos de control y link
+            directo a MercadoPublico.
+        """
 
         df = self._read_lic_xlsx_from_zip(zip_path)
         df_list = self._read_lic_csv(csv_path)
@@ -81,7 +146,7 @@ class LicTransformer:
         )
 
         df_filtered = df[(df["Fecha Publicación"] >= from_date) & (df["Fecha Publicación"] <= to_date) & (
-            df["Numero Adquisición"].str.contains(pattern))].reset_index(drop=True)
+            df["Numero Adquisición"].str.contains(pattern, na=False))].reset_index(drop=True)
 
         df_filtered.rename(columns=rename_columns, inplace=True)
 

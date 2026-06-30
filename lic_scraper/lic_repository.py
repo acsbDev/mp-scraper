@@ -5,11 +5,40 @@ from pymongo.database import Database
 
 
 class LicRepository:
+    """
+    Repositorio encargado de administrar la persistencia de licitaciones en MongoDB.
+
+    Centraliza las operaciones contra la colección licitaciones, incluyendo la
+    inserción de nuevos documentos y la eliminación de registros duplicados por id.
+    Esta clase no transforma datos ni realiza scraping; solo interactúa con la base
+    de datos.
+    """
+
     def __init__(self, db: Database):
+        """
+        Inicializa el repositorio de licitaciones.
+
+        Args:
+            db: Instancia de la base de datos de MongoDB utilizada para acceder a la
+                colección licitaciones.
+        """
         self.lic_col = db.licitaciones
         self.log = logging.getLogger(self.__class__.__name__)
 
     def insert_many(self, df: pd.DataFrame) -> int:
+        """
+        Inserta múltiples licitaciones en MongoDB.
+
+        Convierte el DataFrame recibido a una lista de documentos y los inserta en la
+        colección licitaciones. Si el DataFrame está vacío o no contiene registros,
+        retorna 0 sin realizar operaciones en la base de datos.
+
+        Args:
+            df: DataFrame con las licitaciones listas para guardar.
+
+        Returns:
+            int: Cantidad de licitaciones insertadas.
+        """
         if df.empty:
             return 0
 
@@ -27,6 +56,19 @@ class LicRepository:
         return inserted_count
 
     def delete_duplicates(self) -> int:
+        """
+        Inserta múltiples licitaciones en MongoDB.
+
+        Convierte el DataFrame recibido a una lista de documentos y los inserta en la
+        colección licitaciones. Si el DataFrame está vacío o no contiene registros,
+        retorna 0 sin realizar operaciones en la base de datos.
+
+        Args:
+            df: DataFrame con las licitaciones listas para guardar.
+
+        Returns:
+            int: Cantidad de licitaciones insertadas.
+        """
         pipeline = [
             {
                 "$sort": {
