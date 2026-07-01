@@ -1,4 +1,6 @@
 from pymongo import MongoClient
+import logging
+import sys
 
 from lic_scraper.settings import settings
 from lic_scraper.mp_web_scraper import MPWebScraper
@@ -8,7 +10,18 @@ from lic_scraper.lic_runner import LicScraperRunner
 from lic_scraper.run_state import RunState
 
 
+def configure_logging() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
+        force=True,
+    )
+
+
 def main():
+    configure_logging()
+
     mongo_client = MongoClient(settings.mongo_uri)
     db = mongo_client[settings.db_name]
 
@@ -37,5 +50,5 @@ def main():
 
 
 if __name__ == "__main__":
-    
+
     main()

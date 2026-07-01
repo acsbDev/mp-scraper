@@ -50,8 +50,8 @@ class MPWebScraper:
         options = Options()
 
         if headless:
-            options.add_argument("--headless")
-            options.add_argument("--window-size=1920,1080")
+            # options.add_argument("--headless")
+            # options.add_argument("--window-size=1920,1080")
             options.add_argument("--disable-gpu")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
@@ -228,7 +228,7 @@ class MPWebScraper:
 
                 self.log.info("Descarga CSV iniciada")
 
-                return self._wait_for_downloads(".csv", started_at)
+                return self._wait_for_downloads(".csv", started_at, 180)
 
             except (TimeoutException, StaleElementReferenceException) as e:
                 self.log.warning(

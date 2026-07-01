@@ -1,6 +1,7 @@
 import re
 import zipfile
 import unidecode
+import logging
 import pandas as pd
 
 
@@ -15,6 +16,9 @@ class LicTransformer:
 
     Esta clase no realiza scraping ni operaciones contra la base de datos.
     """
+
+    def __init__(self):
+        self.log = logging.getLogger(self.__class__.__name__)
 
     def _normalize_text(self, text):
         """
@@ -110,8 +114,17 @@ class LicTransformer:
             directo a MercadoPublico.
         """
 
+        self.log.info("Leyendo archivo ZIP: %s", zip_path)
         df = self._read_lic_xlsx_from_zip(zip_path)
+
+        self.log.info("Leyendo archivo CSV: %s", csv_path)
         df_list = self._read_lic_csv(csv_path)
+
+        self.log.info(
+            "Filtrando licitaciones desde %s hasta %s",
+            from_date,
+            to_date,
+        )
 
         df.drop(
             columns=[
@@ -151,7 +164,7 @@ class LicTransformer:
         df_filtered.rename(columns=rename_columns, inplace=True)
 
         if df_filtered.empty:
-            print("No se encontraron licitaciones")
+            self.log.info("No se encontraron licitaciones")
             return pd.DataFrame(columns=df_filtered.columns)
 
         df_list.rename(columns={
@@ -163,10 +176,11 @@ class LicTransformer:
 
         df_filtered = df_filtered.merge(prod_count, on="id")
 
-        df_filtered.info()
-
         df_filtered = df_filtered.merge(
             df_list, left_on="id", right_on="id", how="left")
+        
+        self.log.info("Licitaciones filtradas: %s filas", len(df_filtered))
+        self.log.info("Licitaciones únicas: %s", df_filtered["id"].nunique())
 
         text_columns = ['name', 'organism', 'desc', 'unit', 'region']
 
@@ -217,5 +231,10 @@ class LicTransformer:
 
         df_final_prod["link"] = df_final_prod["id"].apply(
             lambda x: f"http://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion={x}")
+        
+        self.log.info(
+            "Transformación finalizada: %s licitaciones listas para guardar",
+            len(df_final_prod),
+        )
 
         return df_final_prod
